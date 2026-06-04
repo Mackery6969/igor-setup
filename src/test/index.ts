@@ -147,6 +147,13 @@ describe("Test Suite", function () {
       }).to.throw("Runtime does not exist in GameMaker's RSS feed!");
     });
 
+    it("Can find an existing license file and verify it", async function () {
+      const igorSetup = new IgorSetup(accessKey, "0.0.0.0");
+      await igorSetup.ensureIgorBootStrapperBasedOnOs();
+      const needNewLicense = await igorSetup.getIgorLicense();
+      expect(needNewLicense).to.be.false;
+    });
+
     it("Can download new runtime", async function () {
       const igorSetup = new IgorSetup(
         accessKey,

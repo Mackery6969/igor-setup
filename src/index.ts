@@ -50,6 +50,7 @@ export async function run() {
       await restoreCache(primaryKey, [
         igorSetup.runtimeDir,
         igorSetup.bootstrapperDir,
+        igorSetup.userDir
       ]);
     }
 

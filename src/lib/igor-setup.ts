@@ -177,25 +177,33 @@ export class IgorSetup {
 
   async getIgorLicense() {
     // Get the license file
-    const licenseFileDir = path.join(this.userDir, "licence.plist");
-    if (!fs.existsSync(licenseFileDir)) {
-      const fetchLicenseArgs = [
-        "runtime",
-        "FetchLicense",
-        `-ak=${this.accessKey}`,
-        `-of=${licenseFileDir}`
-      ];
-
-      console.log(this.igorExecutable);
-      console.log(fetchLicenseArgs.join("\n"));
-      console.log([this.igorExecutable, fetchLicenseArgs.join(" ")].join(" "));
-
-      ps.spawnSync(this.igorExecutable, fetchLicenseArgs, {
-        stdio: "inherit",
-        cwd: path.dirname(this.igorExecutable)
+    const gmUserDir = path.join(this.workingDir, "gm-user");
+    const tempUserDir = this.userDir;
+    let licenseFileDir = path.join(tempUserDir, "licence.plist");
+    let needNewLicense = false;
+    //Search the working dir for any existing license files and use that dir
+    const existingLicenseFile = fs
+      .readdirSync(gmUserDir, {
+        recursive: true,
+        withFileTypes: false
+      })
+      .find((file) => {
+        if (file.includes("licence.plist")) {
+          const thisLicenseFileDir = path.join(gmUserDir, file as string);
+          if (this.licenseIsStillValid(thisLicenseFileDir)) {
+            return true;
+          }
+        }
       });
+    if (existingLicenseFile) {
+      licenseFileDir = path.join(gmUserDir, existingLicenseFile as string);
+      core.info(`Found existing license file at: ${licenseFileDir}`);
     } else {
-      core.info(`License file already exists at: ${licenseFileDir}`);
+      needNewLicense = true;
+    }
+
+    if (needNewLicense) {
+      await this.getNewLicense(licenseFileDir);
     }
 
     const licenseFile = fs.readFileSync(licenseFileDir, "utf-8");
@@ -203,11 +211,53 @@ export class IgorSetup {
     const userName = licenseFileContent.email.split("@")[0];
     const id = licenseFileContent.id;
     this.userName = `${userName}_${id}`;
-    const newUserDir = path.join(this.workingDir, "gm-user", this.userName);
-    fs.ensureDirSync(newUserDir);
-    fs.copySync(this.userDir, newUserDir);
-    fs.removeSync(this.userDir);
+    const newUserDir = path.join(gmUserDir, this.userName);
+    if (!fs.existsSync(newUserDir)) {
+      fs.ensureDirSync(newUserDir);
+      fs.copySync(tempUserDir, newUserDir);
+      fs.removeSync(tempUserDir);
+    }
     this.userDir = newUserDir;
+
+    return needNewLicense;
+  }
+
+  async getNewLicense(licenseFileDir: string) {
+    core.info("License file does not exist, fetching from Igor...");
+
+    const fetchLicenseArgs = [
+      "runtime",
+      "FetchLicense",
+      `-ak=${this.accessKey}`,
+      `-of=${licenseFileDir}`
+    ];
+
+    console.log(this.igorExecutable);
+    console.log(fetchLicenseArgs.join("\n"));
+    console.log([this.igorExecutable, fetchLicenseArgs.join(" ")].join(" "));
+
+    ps.spawnSync(this.igorExecutable, fetchLicenseArgs, {
+      stdio: "inherit",
+      cwd: path.dirname(this.igorExecutable)
+    });
+  }
+
+  licenseIsStillValid(licenseFileDir: string) {
+    if (!fs.existsSync(licenseFileDir)) {
+      throw new Error("Failed to fetch license file from Igor!");
+    } else {
+      const licenseFile = fs.readFileSync(licenseFileDir, "utf-8");
+      const licenseFileContent = plist.parse(licenseFile) as any;
+      const expiryDate = licenseFileContent.expiry_date;
+      if (!expiryDate) {
+        return true;
+      } else {
+        //Format is like "2026-06-27 23:59:59 UTC"
+        const expiryDateObj = new Date(expiryDate);
+        const now = new Date();
+        return expiryDateObj > now;
+      }
+    }
   }
 
   getDefaultModulesIfNull(modules?: ModuleAliases[]) {
