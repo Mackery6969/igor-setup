@@ -97366,7 +97366,7 @@ class IgorSetup {
         lib_default().ensureDirSync(this.workingDir);
         this.userDir = external_path_default().join(this.workingDir, "gm-user", this.userName);
         lib_default().ensureDirSync(this.userDir);
-        this._populateUserDir();
+        this.populateUserDir();
     }
     get workingDirDevices() {
         return external_path_default().join(this.userDir, "devices.json");
@@ -97511,18 +97511,6 @@ class IgorSetup {
         if (needNewLicense) {
             await this.getNewLicense(licenseFileDir);
         }
-        const licenseFile = lib_default().readFileSync(licenseFileDir, "utf-8");
-        const licenseFileContent = plist_default().parse(licenseFile);
-        const userName = licenseFileContent.email.split("@")[0];
-        const id = licenseFileContent.id;
-        this.userName = `${userName}_${id}`;
-        const newUserDir = external_path_default().join(gmUserDir, this.userName);
-        if (!lib_default().existsSync(newUserDir)) {
-            lib_default().ensureDirSync(newUserDir);
-            lib_default().copySync(tempUserDir, newUserDir);
-            lib_default().removeSync(tempUserDir);
-        }
-        this.userDir = newUserDir;
         return needNewLicense;
     }
     async getNewLicense(licenseFileDir) {
@@ -97643,7 +97631,7 @@ class IgorSetup {
     /**
      * @description Create a working dir where the local_settings is copied to. The local_settings file will also point to the temp and cache dir.
      */
-    _populateUserDir() {
+    populateUserDir() {
         lib_default().writeJsonSync(this.workingDirLocalSettings, this._createLocalSettings());
         let devicesJsonContent = { mac: {} };
         if (this.devicesSettingsFile) {
@@ -144740,6 +144728,7 @@ async function run() {
         }
         await igorSetup.ensureIgorBootStrapperBasedOnOs();
         await igorSetup.getIgorLicense();
+        igorSetup.populateUserDir();
         igorSetup.installModules(targetModulesSplitAsArray);
         info(`Installed modules: ${igorSetup.targetModules.join(",")}`);
         info(`For runtime: ${targetRuntime}`);
