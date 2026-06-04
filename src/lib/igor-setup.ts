@@ -201,7 +201,7 @@ export class IgorSetup {
   }
 
   async getNewLicense(licenseFileDir: string) {
-    core.info("License file does not exist, fetching from Igor...");
+    core.info("Getting new license from Igor...");
 
     const fetchLicenseArgs = [
       "runtime",
