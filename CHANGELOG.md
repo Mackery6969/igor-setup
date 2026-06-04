@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.2](https://github.com/bscotch/igor-setup/compare/v1.4.1...v1.4.2) (2026-06-04)
+
+
+### Bug Fixes
+
+* Stop parsing the user name and id and just use the tempUser dir as the user settings dir. This makes the dir deterministic and we can cache and restore it. ([5fd3c85](https://github.com/bscotch/igor-setup/commit/5fd3c850ddac417519ada3e354cd0a2e12f3f8ca))
+
 ## [1.4.1](https://github.com/bscotch/igor-setup/compare/v1.4.0...v1.4.1) (2026-06-04)
 
 
