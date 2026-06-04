@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/bscotch/igor-setup/compare/v1.4.0...v1.4.1) (2026-06-04)
+
+
+### Bug Fixes
+
+* License file caching should now work correctly. ([7b97710](https://github.com/bscotch/igor-setup/commit/7b9771003502523c448fcb321f8765551d9a6e0b))
+
 ## [1.4.0](https://github.com/bscotch/igor-setup/compare/v1.3.0...v1.4.0) (2026-05-28)
 
 
