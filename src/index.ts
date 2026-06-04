@@ -56,6 +56,7 @@ export async function run() {
 
     await igorSetup.ensureIgorBootStrapperBasedOnOs();
     await igorSetup.getIgorLicense();
+    igorSetup.populateUserDir();
     igorSetup.installModules(targetModulesSplitAsArray);
     core.info(`Installed modules: ${igorSetup.targetModules.join(",")}`);
     core.info(`For runtime: ${targetRuntime}`);

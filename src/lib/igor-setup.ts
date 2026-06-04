@@ -30,7 +30,7 @@ export class IgorSetup {
     fs.ensureDirSync(this.workingDir);
     this.userDir = path.join(this.workingDir, "gm-user", this.userName);
     fs.ensureDirSync(this.userDir);
-    this._populateUserDir();
+    this.populateUserDir();
   }
 
   get workingDirDevices() {
@@ -205,20 +205,6 @@ export class IgorSetup {
     if (needNewLicense) {
       await this.getNewLicense(licenseFileDir);
     }
-
-    const licenseFile = fs.readFileSync(licenseFileDir, "utf-8");
-    const licenseFileContent = plist.parse(licenseFile) as any;
-    const userName = licenseFileContent.email.split("@")[0];
-    const id = licenseFileContent.id;
-    this.userName = `${userName}_${id}`;
-    const newUserDir = path.join(gmUserDir, this.userName);
-    if (!fs.existsSync(newUserDir)) {
-      fs.ensureDirSync(newUserDir);
-      fs.copySync(tempUserDir, newUserDir);
-      fs.removeSync(tempUserDir);
-    }
-    this.userDir = newUserDir;
-
     return needNewLicense;
   }
 
@@ -376,7 +362,7 @@ export class IgorSetup {
   /**
    * @description Create a working dir where the local_settings is copied to. The local_settings file will also point to the temp and cache dir.
    */
-  private _populateUserDir() {
+  populateUserDir() {
     fs.writeJsonSync(this.workingDirLocalSettings, this._createLocalSettings());
     let devicesJsonContent = { mac: {} };
     if (this.devicesSettingsFile) {
