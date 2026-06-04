@@ -97484,28 +97484,21 @@ class IgorSetup {
     }
     async getIgorLicense() {
         // Get the license file
-        const gmUserDir = external_path_default().join(this.workingDir, "gm-user");
         const tempUserDir = this.userDir;
         let licenseFileDir = external_path_default().join(tempUserDir, "licence.plist");
         let needNewLicense = false;
-        //Search the working dir for any existing license files and use that dir
-        const existingLicenseFile = lib_default().readdirSync(gmUserDir, {
-            recursive: true,
-            withFileTypes: false
-        })
-            .find((file) => {
-            if (file.includes("licence.plist")) {
-                const thisLicenseFileDir = external_path_default().join(gmUserDir, file);
-                if (this.licenseIsStillValid(thisLicenseFileDir)) {
-                    return true;
-                }
-            }
-        });
-        if (existingLicenseFile) {
-            licenseFileDir = external_path_default().join(gmUserDir, existingLicenseFile);
+        if (lib_default().existsSync(licenseFileDir)) {
             info(`Found existing license file at: ${licenseFileDir}`);
+            if (this.licenseIsStillValid(licenseFileDir)) {
+                info(`Existing license file is still valid.`);
+            }
+            else {
+                info(`Existing license file is expired.`);
+                needNewLicense = true;
+            }
         }
         else {
+            info(`License file does not exist.`);
             needNewLicense = true;
         }
         if (needNewLicense) {
