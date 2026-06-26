@@ -17,6 +17,8 @@ inputs:
     description: "A comma separated string for the modules to install."
   cache:
     description: "Set to 'true' to cache the runtime for future workflow runs"
+  cache-root:
+    description: "Persistent local cache root for self-hosted runners. When set, runtimes, bootstrapper, user settings, asset cache, and temp folders are stored under this path instead of the workspace. Also falls back to the GM_CACHE_ROOT environment variable."
   module:
     description: "Aliased version of `modules`."
 outputs:

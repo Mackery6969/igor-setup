@@ -23,6 +23,10 @@ export async function run() {
     );
     const devicesOverrideFile = core.getInput("devices-settings-override-file");
     const cache = core.getInput("cache");
+    const cacheRoot = core.getInput("cache-root") || process.env.GM_CACHE_ROOT;
+    if (cacheRoot) {
+      core.info(`Using persistent local cache root: ${cacheRoot}`);
+    }
 
     const targetModulesFromInputModule = core.getInput("module");
     const targetModulesFromInputModules = core.getInput("modules");
@@ -38,13 +42,23 @@ export async function run() {
       accessKey,
       targetRuntime,
       localSettingsOverrideFile,
-      devicesOverrideFile
+      devicesOverrideFile,
+      {
+        cacheRoot
+      }
     );
     const targetModulesSplitAsArray = targetModules
-      ? targetModules.split(",")
+      ? targetModules
+          .split(",")
+          .map((module) => module.trim())
+          .filter(Boolean)
       : igorSetup.getDefaultModulesIfNull(undefined);
 
-    if (cache === "true") {
+    if (cache === "true" && cacheRoot) {
+      core.info(
+        "Skipping actions/cache because cache-root/GM_CACHE_ROOT is using persistent local storage."
+      );
+    } else if (cache === "true") {
       const primaryKey = `${platform()}-${targetModulesSplitAsArray.join(",")}-${targetRuntime}`;
       core.info(`Cache primary key: ${primaryKey}`);
       await restoreCache(primaryKey, [

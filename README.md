@@ -1,3 +1,7 @@
+# Fork Note
+
+This fork is primarily for my own use, but feel free to use it as well. mainly to make igor use the self-hosted cache for runtimes and asset caches.
+
 # igor-setup
 
 This action allows you to set up the [Igor executable](https://manual.gamemaker.io/beta/en/#t=Settings%2FBuilding_via_Command_Line.htm) to build GameMaker projects with the [Igor-Build](https://github.com/bscotch/igor-build) GitHub Action.
@@ -42,6 +46,17 @@ This action allows you to set up the [Igor executable](https://manual.gamemaker.
     # Set to 'true' to cache the runtime for future workflow runs
     # Default: 'false'
     cache:
+
+    # Persistent local cache root for self-hosted runners. If provided, or if
+    # GM_CACHE_ROOT is set, this action stores runtimes, bootstrapper files,
+    # user settings/license, asset cache, and temp files under this root.
+    # Example layout:
+    #   E:\gm-cache\runtimes
+    #   E:\gm-cache\bootstrapper
+    #   E:\gm-cache\gm-sandbox
+    #   E:\gm-cache\assets
+    #   E:\gm-cache\temp
+    cache-root:
 
     #Aliased version of `modules`.
     module:

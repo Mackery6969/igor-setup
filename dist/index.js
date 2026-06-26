@@ -97348,19 +97348,36 @@ async function listArtifacts(type) {
 
 
 class IgorSetup {
-    constructor(accessKey, targetRuntime, localSettingsFile, devicesSettingsFile) {
+    constructor(accessKey, targetRuntime, localSettingsFile, devicesSettingsFile, options = {}) {
         this.accessKey = accessKey;
         this.targetRuntime = targetRuntime;
         this.localSettingsFile = localSettingsFile;
         this.devicesSettingsFile = devicesSettingsFile;
         this.igorExecutable = "";
         this.userName = "tempUser";
-        this.bootstrapperDir = __nccwpck_require__.ab + "bootstrapper";
-        this.runtimeDir = __nccwpck_require__.ab + "runtimes";
-        this.workingDir = __nccwpck_require__.ab + "gm-sandbox";
         this.userDir = "";
         this.targetRuntimeDir = "";
         this.targetModules = [];
+        this.cacheRoot = options.cacheRoot
+            ? external_path_default().resolve(options.cacheRoot)
+            : undefined;
+        this.runtimeDir = this.cacheRoot
+            ? external_path_default().join(this.cacheRoot, "runtimes")
+            : external_path_default().resolve("runtimes");
+        this.bootstrapperDir = this.cacheRoot
+            ? external_path_default().join(this.cacheRoot, "bootstrapper")
+            : external_path_default().resolve("bootstrapper");
+        this.workingDir = this.cacheRoot
+            ? external_path_default().join(this.cacheRoot, "gm-sandbox")
+            : external_path_default().resolve("gm-sandbox");
+        this.assetCacheDir = this.cacheRoot
+            ? external_path_default().join(this.cacheRoot, "assets")
+            : external_path_default().join(this.workingDir, "gm-cache");
+        this.tempCacheDir = this.cacheRoot
+            ? external_path_default().join(this.cacheRoot, "temp")
+            : external_path_default().join(this.workingDir, "gm-temp");
+        lib_default().ensureDirSync(this.runtimeDir);
+        lib_default().ensureDirSync(this.bootstrapperDir);
         lib_default().ensureDirSync(this.cacheDir);
         lib_default().ensureDirSync(this.tempDir);
         lib_default().ensureDirSync(this.workingDir);
@@ -97375,10 +97392,10 @@ class IgorSetup {
         return external_path_default().join(this.userDir, "local_settings.json");
     }
     get cacheDir() {
-        return external_path_default().join(this.workingDir, "gm-cache");
+        return this.assetCacheDir;
     }
     get tempDir() {
-        return external_path_default().join(this.workingDir, "gm-temp");
+        return this.tempCacheDir;
     }
     static async getRuntimeBasedOnYyp(yypPath) {
         if (!lib_default().existsSync(yypPath)) {
@@ -97507,7 +97524,7 @@ class IgorSetup {
         return needNewLicense;
     }
     async getNewLicense(licenseFileDir) {
-        info("License file does not exist, fetching from Igor...");
+        info("Getting new license from Igor...");
         const fetchLicenseArgs = [
             "runtime",
             "FetchLicense",
@@ -97570,11 +97587,7 @@ class IgorSetup {
         }
         else {
             if (!this.modulesAreInstalled(modules)) {
-                const osModule = this._getRequiredOsModule();
-                let targetAndOsModules = modules;
-                if (osModule) {
-                    targetAndOsModules = modules.concat(osModule);
-                }
+                const targetAndOsModules = this._getModulesToInstall(modules);
                 const args = [];
                 args.push(`/rp=${this.runtimeDir}`, `/ru=${this._inferFeed()}`, `/uf=${this.userDir}`, `/m=${targetAndOsModules.join(",")}`, `--`, `Runtime`, `Install`, this.targetRuntime);
                 info(this.igorExecutable);
@@ -97735,6 +97748,17 @@ class IgorSetup {
         }
         requiredModules.push("base");
         return requiredModules;
+    }
+    _getModulesToInstall(modules) {
+        const modulesToInstall = new Set();
+        for (const module of modules) {
+            for (const requiredModule of this._getRequiredModules(module)) {
+                if (requiredModule !== "base") {
+                    modulesToInstall.add(requiredModule);
+                }
+            }
+        }
+        return Array.from(modulesToInstall);
     }
     _inferFeed() {
         const feeds = [
@@ -144700,17 +144724,29 @@ async function run() {
         const localSettingsOverrideFile = getInput("local-settings-override-file");
         const devicesOverrideFile = getInput("devices-settings-override-file");
         const cache = getInput("cache");
+        const cacheRoot = getInput("cache-root") || process.env.GM_CACHE_ROOT;
+        if (cacheRoot) {
+            info(`Using persistent local cache root: ${cacheRoot}`);
+        }
         const targetModulesFromInputModule = getInput("module");
         const targetModulesFromInputModules = getInput("modules");
         if (targetModulesFromInputModule && targetModulesFromInputModules) {
             throw new Error("Both `module` and `modules` are specified. You must specify only one.");
         }
         const targetModules = targetModulesFromInputModule || targetModulesFromInputModules;
-        const igorSetup = new IgorSetup(accessKey, targetRuntime, localSettingsOverrideFile, devicesOverrideFile);
+        const igorSetup = new IgorSetup(accessKey, targetRuntime, localSettingsOverrideFile, devicesOverrideFile, {
+            cacheRoot
+        });
         const targetModulesSplitAsArray = targetModules
-            ? targetModules.split(",")
+            ? targetModules
+                .split(",")
+                .map((module) => module.trim())
+                .filter(Boolean)
             : igorSetup.getDefaultModulesIfNull(undefined);
-        if (cache === "true") {
+        if (cache === "true" && cacheRoot) {
+            info("Skipping actions/cache because cache-root/GM_CACHE_ROOT is using persistent local storage.");
+        }
+        else if (cache === "true") {
             const primaryKey = `${(0,external_os_.platform)()}-${targetModulesSplitAsArray.join(",")}-${targetRuntime}`;
             info(`Cache primary key: ${primaryKey}`);
             await cache_restore_restoreCache(primaryKey, [

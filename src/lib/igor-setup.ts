@@ -9,22 +9,50 @@ import plist from "plist";
 import * as core from "@actions/core";
 import { fetchReleasesSummaryWithNotes } from "@bscotch/gamemaker-releases";
 
+export interface IgorSetupOptions {
+  cacheRoot?: string;
+}
+
 export class IgorSetup {
   igorExecutable = "";
   userName = "tempUser";
-  bootstrapperDir = path.resolve("bootstrapper");
-  runtimeDir = path.resolve("runtimes");
-  workingDir = path.resolve("gm-sandbox");
+  bootstrapperDir: string;
+  runtimeDir: string;
+  workingDir: string;
   userDir = "";
   targetRuntimeDir = "";
   targetModules: ModuleAliases[] = [];
+  private readonly cacheRoot?: string;
+  private readonly assetCacheDir: string;
+  private readonly tempCacheDir: string;
 
   constructor(
     private readonly accessKey: string,
     private readonly targetRuntime: string,
     private readonly localSettingsFile?: string,
-    private readonly devicesSettingsFile?: string
+    private readonly devicesSettingsFile?: string,
+    options: IgorSetupOptions = {}
   ) {
+    this.cacheRoot = options.cacheRoot
+      ? path.resolve(options.cacheRoot)
+      : undefined;
+    this.runtimeDir = this.cacheRoot
+      ? path.join(this.cacheRoot, "runtimes")
+      : path.resolve("runtimes");
+    this.bootstrapperDir = this.cacheRoot
+      ? path.join(this.cacheRoot, "bootstrapper")
+      : path.resolve("bootstrapper");
+    this.workingDir = this.cacheRoot
+      ? path.join(this.cacheRoot, "gm-sandbox")
+      : path.resolve("gm-sandbox");
+    this.assetCacheDir = this.cacheRoot
+      ? path.join(this.cacheRoot, "assets")
+      : path.join(this.workingDir, "gm-cache");
+    this.tempCacheDir = this.cacheRoot
+      ? path.join(this.cacheRoot, "temp")
+      : path.join(this.workingDir, "gm-temp");
+    fs.ensureDirSync(this.runtimeDir);
+    fs.ensureDirSync(this.bootstrapperDir);
     fs.ensureDirSync(this.cacheDir);
     fs.ensureDirSync(this.tempDir);
     fs.ensureDirSync(this.workingDir);
@@ -42,11 +70,11 @@ export class IgorSetup {
   }
 
   get cacheDir() {
-    return path.join(this.workingDir, "gm-cache");
+    return this.assetCacheDir;
   }
 
   get tempDir() {
-    return path.join(this.workingDir, "gm-temp");
+    return this.tempCacheDir;
   }
 
   static async getRuntimeBasedOnYyp(yypPath: string) {
@@ -268,11 +296,7 @@ export class IgorSetup {
       core.info("Modules already installed!");
     } else {
       if (!this.modulesAreInstalled(modules)) {
-        const osModule = this._getRequiredOsModule();
-        let targetAndOsModules = modules;
-        if (osModule) {
-          targetAndOsModules = modules.concat(osModule);
-        }
+        const targetAndOsModules = this._getModulesToInstall(modules);
 
         const args = [];
         args.push(
@@ -476,6 +500,18 @@ export class IgorSetup {
     }
     requiredModules.push("base");
     return requiredModules;
+  }
+
+  private _getModulesToInstall(modules: ModuleAliases[]) {
+    const modulesToInstall = new Set<ModuleAliases | string>();
+    for (const module of modules) {
+      for (const requiredModule of this._getRequiredModules(module)) {
+        if (requiredModule !== "base") {
+          modulesToInstall.add(requiredModule);
+        }
+      }
+    }
+    return Array.from(modulesToInstall) as ModuleAliases[];
   }
 
   private _inferFeed() {

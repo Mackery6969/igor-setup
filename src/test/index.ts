@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import fs from "fs-extra";
 import { join, resolve } from "path";
+import { platform } from "os";
 import { IgorSetup } from "../lib/igor-setup.js";
 import { LocalSettings, ModuleAliases } from "../lib/types.js";
 import dotenv from "dotenv";
@@ -61,6 +62,48 @@ describe("Test Suite", function () {
       expect(
         localSettings["machine.General Settings.Paths.IDE.AssetCacheFolder"]
       ).to.equal(igorSetup.cacheDir);
+    });
+    it("Can use a persistent self-hosted cache root", function () {
+      const cacheRoot = resolve(sandboxRoot, "self-hosted-cache");
+      const igorSetup = new IgorSetup(
+        accessKey,
+        targetRuntime,
+        undefined,
+        undefined,
+        { cacheRoot }
+      );
+      expect(igorSetup.runtimeDir).to.equal(join(cacheRoot, "runtimes"));
+      expect(igorSetup.bootstrapperDir).to.equal(
+        join(cacheRoot, "bootstrapper")
+      );
+      expect(igorSetup.cacheDir).to.equal(join(cacheRoot, "assets"));
+      expect(igorSetup.tempDir).to.equal(join(cacheRoot, "temp"));
+      const localSettings = fs.readJsonSync(
+        igorSetup.workingDirLocalSettings
+      ) as Partial<LocalSettings>;
+      expect(localSettings.runtimeDir).to.equal(igorSetup.runtimeDir);
+      expect(
+        localSettings["machine.General Settings.Paths.IDE.TempFolder"]
+      ).to.equal(igorSetup.tempDir);
+      expect(
+        localSettings["machine.General Settings.Paths.IDE.AssetCacheFolder"]
+      ).to.equal(igorSetup.cacheDir);
+    });
+    it("Can expand the windows target to the required runtime modules", function () {
+      const igorSetup = new IgorSetup(accessKey, targetRuntime);
+      const modules = (igorSetup as any)._getModulesToInstall([
+        "windows"
+      ]) as string[];
+      const osModule =
+        platform() === "win32"
+          ? "base-module-windows"
+          : platform() === "darwin"
+            ? "base-module-osx"
+            : "base-module-linux";
+      expect(modules).to.include("windows");
+      expect(modules).to.include("windowsYYC");
+      expect(modules).to.include(`${osModule}-${process.arch}`);
+      expect(modules).not.to.include("base");
     });
     it("Can create a local_setting.json file that uses the provided local_settings.json file for SDK config paths", function () {
       const igorSetup = new IgorSetup(
