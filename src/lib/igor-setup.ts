@@ -333,25 +333,113 @@ export class IgorSetup {
   }
 
   modulesAreInstalled(modules: ModuleAliases[]) {
+    modules = this.getDefaultModulesIfNull(modules);
     const runtimeReceiptPath = path.join(
-      this.runtimeDir,
-      `runtime-${this.targetRuntime}`,
+      this.targetRuntimeRoot,
       "receipt.json"
     );
     if (!fs.existsSync(runtimeReceiptPath)) {
-      return false;
+      return this.legacyRuntimeModulesAreInstalled(modules);
     }
 
     for (const module of modules) {
-      const requiredModules = this._getRequiredModules(module);
       const downloadedModules = Object.keys(
         fs.readJSONSync(runtimeReceiptPath)
+      );
+      const receiptHasBaseOsModule = downloadedModules.some((module) =>
+        module.startsWith("base-module-")
+      );
+      const requiredModules = this._getRequiredModules(module).filter(
+        (module) => receiptHasBaseOsModule || !module.startsWith("base-module-")
       );
       if (!requiredModules.every((i) => downloadedModules.includes(i))) {
         return false;
       }
     }
     return true;
+  }
+
+  private get targetRuntimeRoot() {
+    return path.join(this.runtimeDir, `runtime-${this.targetRuntime}`);
+  }
+
+  private legacyRuntimeModulesAreInstalled(modules: ModuleAliases[]) {
+    if (!fs.existsSync(this.targetRuntimeRoot)) {
+      return false;
+    }
+
+    core.info(
+      "Runtime receipt not found; checking legacy runtime file layout instead."
+    );
+    const requiredPaths = [
+      ...this._getLegacyBaseRuntimePaths(),
+      ...modules.flatMap((module) => this._getLegacyModulePaths(module))
+    ];
+    const missingPath = requiredPaths.find(
+      (relativePath) => !fs.existsSync(path.join(this.targetRuntimeRoot, ...relativePath))
+    );
+    if (missingPath) {
+      core.info(`Legacy runtime check missing: ${missingPath.join(path.sep)}`);
+      return false;
+    }
+
+    core.info("Legacy runtime files found; treating modules as installed.");
+    return true;
+  }
+
+  private _getLegacyBaseRuntimePaths() {
+    const { host, executableExtension } = this._getLegacyHostRuntimeParts();
+    return [
+      [
+        "bin",
+        "assetcompiler",
+        host,
+        process.arch,
+        `GMAssetCompiler${executableExtension}`
+      ],
+      ["bin", "igor", host, process.arch, `Igor${executableExtension}`]
+    ];
+  }
+
+  private _getLegacyModulePaths(targetPlatform: ModuleAliases) {
+    const platformLower = targetPlatform.toLocaleLowerCase();
+    switch (platformLower) {
+      case "android":
+        return [["android"]];
+      case "windows":
+        return [
+          ["windows", "x64", "Runner.exe"],
+          ["yyc", "bin", "x64", "clang++.exe"]
+        ];
+      case "mac":
+        return [["mac"], ["yyc"]];
+      case "ios":
+        return [["ios"]];
+      case "linux":
+        return [["linux"], ["yyc"]];
+      case "xboxone":
+      case "xboxseriesxs":
+        return [["xboxseriesxs"]];
+      case "switch":
+        return [["switch"]];
+      case "operagx":
+        return [["operagx"]];
+      default:
+        throw new Error(`${targetPlatform} is not supported!`);
+    }
+  }
+
+  private _getLegacyHostRuntimeParts() {
+    switch (platform()) {
+      case "win32":
+        return { host: "windows", executableExtension: ".exe" };
+      case "darwin":
+        return { host: "osx", executableExtension: "" };
+      case "linux":
+        return { host: "linux", executableExtension: "" };
+      default:
+        throw new Error("Unsupported platform!");
+    }
   }
 
   private _runtimeExists(runtimeUrl: string) {

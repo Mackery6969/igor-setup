@@ -42,6 +42,19 @@ function resetSandbox() {
   fs.writeFileSync(sampleYyp, `"IDEVersion": "${defaultIDEVersion}"`);
 }
 
+function legacyHostRuntimeParts() {
+  switch (platform()) {
+    case "win32":
+      return { host: "windows", executableExtension: ".exe" };
+    case "darwin":
+      return { host: "osx", executableExtension: "" };
+    case "linux":
+      return { host: "linux", executableExtension: "" };
+    default:
+      throw new Error("Unsupported platform!");
+  }
+}
+
 describe("Test Suite", function () {
   this.timeout(300000);
   before(function () {
@@ -104,6 +117,66 @@ describe("Test Suite", function () {
       expect(modules).to.include("windowsYYC");
       expect(modules).to.include(`${osModule}-${process.arch}`);
       expect(modules).not.to.include("base");
+    });
+    it("Can detect an installed legacy windows runtime without a receipt", function () {
+      const legacyRuntime = "2023.1.1.81";
+      const cacheRoot = resolve(sandboxRoot, "legacy-cache");
+      const igorSetup = new IgorSetup(
+        accessKey,
+        legacyRuntime,
+        undefined,
+        undefined,
+        { cacheRoot }
+      );
+      const runtimeRoot = join(igorSetup.runtimeDir, `runtime-${legacyRuntime}`);
+      const { host, executableExtension } = legacyHostRuntimeParts();
+      const requiredFiles = [
+        join(
+          runtimeRoot,
+          "bin",
+          "assetcompiler",
+          host,
+          process.arch,
+          `GMAssetCompiler${executableExtension}`
+        ),
+        join(
+          runtimeRoot,
+          "bin",
+          "igor",
+          host,
+          process.arch,
+          `Igor${executableExtension}`
+        ),
+        join(runtimeRoot, "windows", "x64", "Runner.exe"),
+        join(runtimeRoot, "yyc", "bin", "x64", "clang++.exe")
+      ];
+
+      for (const file of requiredFiles) {
+        fs.ensureFileSync(file);
+      }
+
+      expect(igorSetup.modulesAreInstalled(["windows"])).to.be.true;
+      fs.removeSync(join(runtimeRoot, "windows", "x64", "Runner.exe"));
+      expect(igorSetup.modulesAreInstalled(["windows"])).to.be.false;
+    });
+    it("Can detect a legacy windows runtime receipt without a base OS module", function () {
+      const legacyRuntime = "2023.1.1.81";
+      const cacheRoot = resolve(sandboxRoot, "legacy-receipt-cache");
+      const igorSetup = new IgorSetup(
+        accessKey,
+        legacyRuntime,
+        undefined,
+        undefined,
+        { cacheRoot }
+      );
+      const runtimeRoot = join(igorSetup.runtimeDir, `runtime-${legacyRuntime}`);
+      fs.outputJsonSync(join(runtimeRoot, "receipt.json"), {
+        windows: "windows",
+        windowsYYC: "windowsYYC",
+        base: "base"
+      });
+
+      expect(igorSetup.modulesAreInstalled(["windows"])).to.be.true;
     });
     it("Can create a local_setting.json file that uses the provided local_settings.json file for SDK config paths", function () {
       const igorSetup = new IgorSetup(

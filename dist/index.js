@@ -97610,18 +97610,92 @@ class IgorSetup {
         }
     }
     modulesAreInstalled(modules) {
-        const runtimeReceiptPath = external_path_default().join(this.runtimeDir, `runtime-${this.targetRuntime}`, "receipt.json");
+        modules = this.getDefaultModulesIfNull(modules);
+        const runtimeReceiptPath = external_path_default().join(this.targetRuntimeRoot, "receipt.json");
         if (!lib_default().existsSync(runtimeReceiptPath)) {
-            return false;
+            return this.legacyRuntimeModulesAreInstalled(modules);
         }
         for (const module of modules) {
-            const requiredModules = this._getRequiredModules(module);
             const downloadedModules = Object.keys(lib_default().readJSONSync(runtimeReceiptPath));
+            const receiptHasBaseOsModule = downloadedModules.some((module) => module.startsWith("base-module-"));
+            const requiredModules = this._getRequiredModules(module).filter((module) => receiptHasBaseOsModule || !module.startsWith("base-module-"));
             if (!requiredModules.every((i) => downloadedModules.includes(i))) {
                 return false;
             }
         }
         return true;
+    }
+    get targetRuntimeRoot() {
+        return external_path_default().join(this.runtimeDir, `runtime-${this.targetRuntime}`);
+    }
+    legacyRuntimeModulesAreInstalled(modules) {
+        if (!lib_default().existsSync(this.targetRuntimeRoot)) {
+            return false;
+        }
+        info("Runtime receipt not found; checking legacy runtime file layout instead.");
+        const requiredPaths = [
+            ...this._getLegacyBaseRuntimePaths(),
+            ...modules.flatMap((module) => this._getLegacyModulePaths(module))
+        ];
+        const missingPath = requiredPaths.find((relativePath) => !lib_default().existsSync(external_path_default().join(this.targetRuntimeRoot, ...relativePath)));
+        if (missingPath) {
+            info(`Legacy runtime check missing: ${missingPath.join((external_path_default()).sep)}`);
+            return false;
+        }
+        info("Legacy runtime files found; treating modules as installed.");
+        return true;
+    }
+    _getLegacyBaseRuntimePaths() {
+        const { host, executableExtension } = this._getLegacyHostRuntimeParts();
+        return [
+            [
+                "bin",
+                "assetcompiler",
+                host,
+                process.arch,
+                `GMAssetCompiler${executableExtension}`
+            ],
+            ["bin", "igor", host, process.arch, `Igor${executableExtension}`]
+        ];
+    }
+    _getLegacyModulePaths(targetPlatform) {
+        const platformLower = targetPlatform.toLocaleLowerCase();
+        switch (platformLower) {
+            case "android":
+                return [["android"]];
+            case "windows":
+                return [
+                    ["windows", "x64", "Runner.exe"],
+                    ["yyc", "bin", "x64", "clang++.exe"]
+                ];
+            case "mac":
+                return [["mac"], ["yyc"]];
+            case "ios":
+                return [["ios"]];
+            case "linux":
+                return [["linux"], ["yyc"]];
+            case "xboxone":
+            case "xboxseriesxs":
+                return [["xboxseriesxs"]];
+            case "switch":
+                return [["switch"]];
+            case "operagx":
+                return [["operagx"]];
+            default:
+                throw new Error(`${targetPlatform} is not supported!`);
+        }
+    }
+    _getLegacyHostRuntimeParts() {
+        switch ((0,external_os_.platform)()) {
+            case "win32":
+                return { host: "windows", executableExtension: ".exe" };
+            case "darwin":
+                return { host: "osx", executableExtension: "" };
+            case "linux":
+                return { host: "linux", executableExtension: "" };
+            default:
+                throw new Error("Unsupported platform!");
+        }
     }
     _runtimeExists(runtimeUrl) {
         const args = [];
